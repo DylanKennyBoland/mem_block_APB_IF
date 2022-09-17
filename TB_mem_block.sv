@@ -18,6 +18,9 @@
 // RESET_VAL parameter.
 
 module TB_mem_block; // empty port list - signals are generated from within
+
+	// ==== Parameters to make the Testbench more Flexible ====
+	localparam DEPTH = 32, ADDR_WIDTH = $clog2(DEPTH), DATA_WIDTH = 8, RESET_VAL = 8'haa;
 	
 	// ==== Define Stimulus Signals ====
 	reg clk;
@@ -25,16 +28,16 @@ module TB_mem_block; // empty port list - signals are generated from within
 	reg sel;
 	reg enable;
 	reg wr;
-	reg [7:0] wdata;
-	reg [7:0] addr;
+	reg [DATA_WIDTH-1:0] wdata;
+	reg [ADDR_WIDTH-1:0] addr;
 	wire ready;
-	wire [7:0] rdata;
+	wire [DATA_WIDTH-1:0] rdata;
 	
 	// ==== Instantiate the DUT ====
 	mem_block # (.DATA_WIDTH(8),
-		.DEPTH(32),
-		.ADDR_WIDTH(5),
-		.RESET_VAL(8'h00)
+		.DEPTH(DEPTH),
+		.ADDR_WIDTH(ADDR_WIDTH),
+		.RESET_VAL(RESET_VAL)
 		) dut (.clk(clk),
 			.reset(reset),
 			.sel(sel),
@@ -53,9 +56,54 @@ module TB_mem_block; // empty port list - signals are generated from within
 			forever
 				#10 clk = ~clk;
 		end
-	
-	// ==== Define the Initial Signal Values ====
-	initial
+
+
+	// ==== Some Variables used for Checking Purposes ====
+	integer pass_count = 0;
+	integer error_count = 0;
+
+	// Task to emulate an APB write transaction
+	task apb_write (input [ADDR_WIDTH-1:0] trans_addr, input [DATA_WIDTH-1:0] data);
+		begin
+			@(posedge clk);
+			#1;
+			sel = 1'b1;
+			wr = 1'b1;
+			addr = trans_addr;
+			wdata = data;
+			@(posedge clk);
+			#1;
+			enable = 1'b1;
+			@(posedge clk);
+			#1;
+			sel = 1'b0;
+			enable = 1'b0;
+		end
+	endtask
+
+	// Task to emulate an APB read transaction
+	task apb_read (input [ADDR_WIDTH-1:0] trans_addr, input [DATA_WIDTH-1:0] expected_data);
+		begin
+			@(posedge clk);
+			#1;
+			sel = 1'b1;
+			wr = 1'b0;
+			addr = trans_addr;
+			@(posedge clk);
+			#1;
+			enable = 1'b1;
+			#1;
+			if (expected_data == rdata) pass_count = pass_count + 1;
+			else error_count = error_count + 1;
+			@(posedge clk);
+			#1;
+			sel = 1'b0;
+			enable = 1'b0;
+		end
+	endtask
+
+	// Task to set the signal values on reset
+	task reset_sigs();
 		begin
 			reset = 1'b0;
 			sel = 1'b0;
@@ -63,35 +111,26 @@ module TB_mem_block; // empty port list - signals are generated from within
 			wr = 1'b0;
 			wdata = 0;
 			addr = 0;
+		end
+	endtask
+
+	// ==== Drive the Signals to the DUT ====
+	initial
+		begin
+			reset_sigs(); // reset the signals initially
 			// ==== Generate Stimulus to the DUT ====
 			#15 reset = 1'b1; // reset the device
 			#20 reset = 1'b0; // set reset low again
-			@(posedge clk)    // wait for a rising clock edge
-			#1;
-			sel = 1'b1;       // select the device just after the clock edge
-			wr = 1'b1;        // start a write transaction
-			addr = 1;         // specify address 1
-			wdata = 8'haa;    // the write data signal (two As are easy to see on waveform diagram)
-			@(posedge clk)    // wait for rising edge
-			#1;
-			enable = 1'b1;    // set enable high
-			@(posedge clk)
-			#1;
-			enable = 1'b0; // set enable low
-			sel = 1'b0;    // unselect the device
-			#20;           // wait some time
-			@(posedge clk)
-			#1;
-			sel = 1'b1;    // select the device just after the clock edge
-			wr = 1'b0;     // try a read transaction
-			addr = 1;      // specify address 1
-			@(posedge clk) // wait for rising edge
-			#1;
-			enable = 1'b1; // set enable high
-			@(posedge clk)
-			#1;
-			enable = 1'b0; // set enable low
-			sel = 1'b0;    // unselect the device
+			#5; // wait a little...
+			apb_write(5'b00011, 8'hbb);    // perform a write transaction
+			#20;
+			apb_read(5'b00011, 8'hbb);     // read back from the address - and specify the expected value in the second argument
+			#10;
+			apb_read(5'b00111, RESET_VAL); // read from a different address (one which we haven't written to) - value should be RESET_VAL
+			#15;
+			apb_write(5'b01111, 8'hca);    // perform another write transaction
+			#10;
+			apb_read(5'b01111, 8'hca);     // read back from the address used in the previous write transaction
 			#200;
 			$stop;
 		end
@@ -102,8 +141,3 @@ module TB_mem_block; // empty port list - signals are generated from within
 			$dumpvars(2);
 		end
 endmodule
-			
-			
-	
-		
-	
