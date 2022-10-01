@@ -21,7 +21,8 @@ module mem_block
         parameter ADDR_WIDTH = $clog2(DEPTH),
 		parameter RESET_VAL = 'h00
 	)
-	(input clk,
+	(
+	 input clk,                        // input clock signal
 	 input reset,                      // active-high reset input pin
 	 input [ADDR_WIDTH-1:0] addr,      // input address to the module
 	 input wr,                         // by default a 1-bit wide wire; indicates a write or read; if wr == 1, a write is being done, and vice versa
@@ -48,10 +49,10 @@ module mem_block
 		end
 		else begin
 			case ({sel, enable})
-			2'b00: next_state = IDLE;
-			2'b10: next_state = ACCESS_PHASE;
-			2'b11: next_state = IDLE;
-			default: next_state = IDLE;
+				2'b00: next_state = IDLE;
+				2'b10: next_state = ACCESS_PHASE;
+				2'b11: next_state = IDLE;
+				default: next_state = IDLE;
 			endcase
 		end
 	 end
@@ -62,9 +63,9 @@ module mem_block
 		end
 		else begin
 			case (next_state)
-			IDLE: curr_state = IDLE;
-			ACCESS_PHASE: curr_state = ACCESS_PHASE;
-			default: curr_state = IDLE;
+				IDLE: curr_state = IDLE;
+				ACCESS_PHASE: curr_state = ACCESS_PHASE;
+				default: curr_state = IDLE;
 			endcase
 		end
 	 end
@@ -79,19 +80,19 @@ module mem_block
 		end
 		else begin
 			case (curr_state)
-			IDLE: begin
-			ready <= 0;
-			rdata <= 0;
-			end
-			ACCESS_PHASE: begin
-			ready <= 1;
-			if (wr) mem_block[addr] <= wdata;
-			else rdata <= mem_block[addr];
-			end
-			default: begin
-			ready <= 0;
-			rdata <= 0;
-			end
+				IDLE: begin
+					ready <= 0;
+					rdata <= 0;
+				end
+				ACCESS_PHASE: begin
+					ready <= 1;
+					if (wr) mem_block[addr] <= wdata;
+					else rdata <= mem_block[addr];
+				end
+				default: begin
+					ready <= 0;
+					rdata <= 0;
+				end
 			endcase
 		end
 	end
