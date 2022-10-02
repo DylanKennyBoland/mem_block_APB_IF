@@ -30,7 +30,7 @@ module mem_block
 	 input sel,                        // active-high select signal; there could be data on the wdata line - only do stuff if sel is high
 	 input enable,                     // enable signal that the master device drives in the transaction
 	 output wire ready,                // ready signal - output of the slave device
-	 output reg [DATA_WIDTH-1:0] rdata // the output of the module contains the data read from the specified address
+	 output wire [DATA_WIDTH-1:0] rdata // the output of the module contains the data read from the specified address
 	 );
 	 
 	 // ==== Define Internal Signals ====
@@ -38,6 +38,7 @@ module mem_block
 	 reg [DATA_WIDTH-1:0] mem_block [DEPTH];  // a block of registers
 	 reg next_state; // used in the state machine
 	 reg curr_state; // used in the state machine
+	 reg [DATA_WIDTH-1:0] rdata_reg; // register to store the data that will be put on the rdata bus
 	 
 	 // ==== Local Parameters to Improve Readability ====
 	 localparam IDLE = 0, ACCESS_PHASE = 1;
@@ -57,7 +58,7 @@ module mem_block
 	 always @ (*) begin // (*) means we do not need to specify the sensitivity list
 		// define default behaviour
 		next_state = curr_state;
-		rdata = {DATA_WIDTH{1'b0}};
+		rdata_reg = {DATA_WIDTH{1'b0}};
 		case (curr_state)
 			IDLE: begin
 				if (sel == 1'b1) begin
@@ -69,7 +70,7 @@ module mem_block
 					if (wr == 1'b1) begin
 						mem_block[addr] = wdata;
 					end else begin
-						rdata = mem_block[addr];
+						rdata_reg = mem_block[addr];
 					end
 					next_state = IDLE;
 				end // else, next_state = curr_state = ACCESS_PHASE
@@ -79,4 +80,5 @@ module mem_block
 	
 	// ==== Drive the Ready Signal ====
 	assign ready = (curr_state == ACCESS_PHASE) ? 1'b1 : 1'b0; // only drive the ready signal when in the access phase
+	assign rdata = rdata_reg;
 endmodule
