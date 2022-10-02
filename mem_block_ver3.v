@@ -82,3 +82,4 @@ module mem_block
 	assign ready = (curr_state == ACCESS_PHASE) ? 1'b1 : 1'b0; // only drive the ready signal when in the access phase
 	assign rdata = rdata_reg;
 endmodule
+
